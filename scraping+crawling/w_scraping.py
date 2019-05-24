@@ -1,4 +1,7 @@
 """
+    ---- 目的 ----
+    Workship Magazine のENGINEERカテゴリの記事タイトル一覧を取得すること
+
     ---- 事前調査で判明していること -----
     Workship MagazineのENGINEERカテゴリ記事一覧：https://goworkship.com/magazine/engineer/
     １ページに最大13記事の一覧が表示
@@ -74,7 +77,7 @@ while True:
     # ページのカウントアップ
     page_index += 1
     
-    # 次のループに行く前に1秒待機(サイトに負荷をかけないため)
+    # 次のループに行く前に最低でも1秒以上待機する(サイトに負荷をかけないため)
     time.sleep(2)
 
 # 全記事一覧を出力
