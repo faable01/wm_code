@@ -59,63 +59,40 @@ class WebsiteCrawler:
         self.robotparser.set_url(robots_url)
         self.robotparser.read()
     
-    def _is_robots_ng(self, url):
+    def _clean_url_list(self, url_list):
         """
-            指定のURLがrobots.txtでアクセス許可されているURLかどうかを判定する
+            収集したURLのリストから余分な情報を除外する
         """
-        return not self.robotparser.can_fetch(self.user_agent, url)
+        # 走査対象のWebサイトの外のURLを除去
+        website_url_list = list(filter(
+            lambda u: u.startswith(self.website_url), url_list
+        ))
 
-    def _is_end(self):
-        """
-            クローリングを終了するかを判定する
-        """
-        len_all = len(self.all_url_list)
-        return self.target_index >= len_all or len_all > self.limit_number
-
-    def _remove_out_of_target_website(self, url_list):
-        """
-            走査対象のWebサイト外のURLをリストから削除する
-        """
-        return list(filter(lambda u: u.startswith(self.website_url), url_list))
-    
-    @staticmethod
-    def is_nofollow_page(beautiful_soup):
-        """
-            このページのrobots metaがnofollowかどうかを判定する.
-            引数：BeautifulSoup解析済みオブジェクト
-        """
-        for robots_meta in beautiful_soup.select("meta[name='robots']"):
-            if 'nofollow' in robots_meta['content']:
-                return True
-    
-    @staticmethod
-    def select_a_tag_removed_nofollow(beautiful_soup):
-        """
-            rel属性がnofollowではないaタグ一覧を取得する.
-            引数：BeautifulSoup解析済みオブジェクト
-        """
-        return list(filter(
-            lambda tag: not 'nofollow' in (tag.get('rel') or ''), 
-            beautiful_soup.select('a'))
-        )
-
-    @staticmethod
-    def remove_url_flagment(url_list):
-        """
-            URLフラグメントを取り除き、純粋なURLのリストを返却する
-            引数：URLのリスト
-            （URLフラグメント：'https://foo.com/hoo#top'の#以降のこと）
-        """
-        return [(
+        # 各URL末尾のURLフラグメントを除去
+        non_flagment_url_list = [(
             lambda u: re.match('(.*?)#.*?', u) or re.match('(.*)', u)
-        )(url).group(1) for url in url_list]
+        )(url).group(1) for url in website_url_list]
+        
+        return non_flagment_url_list
     
-    @staticmethod
-    def remove_duplicates(url_list):
+    def _extract_url(self, beautiful_soup):
         """
-            リスト中の文字列から重複するものを削除する
+            BeautifulSoup解析済みオブジェクトから余分な情報を除外したURLを抽出する
         """
-        return sorted(set(url_list), key=url_list.index)
+        # rel属性がnofollowではないaタグ一覧を取得する
+        a_tag_list = list(filter(
+            lambda tag: not 'nofollow' in (tag.get('rel') or ''),
+            beautiful_soup.select('a')
+        ))
+
+        # aタグ一覧からこのページのURL一覧を取得（href属性の値を取得）
+        # この際相対パスを絶対パスに変換する
+        url_list = [
+            urljoin(self.website_url, tag.get('href')) for tag in a_tag_list
+        ]
+
+        # 余分な情報を除外したURL一覧を返却する
+        return self._clean_url_list(url_list)
 
     def crawl(self):
         """
@@ -132,9 +109,9 @@ class WebsiteCrawler:
             # 走査対象のindexをカウントアップする
             self.target_index += 1
 
-            # 走査対象の要素番号が収集したURLのリストの最後尾に達したか、
-            # 収集したURLが200ページを越えていたら走査終了
-            if self._is_end():
+            # 走査を終えるかの判定
+            len_all = len(self.all_url_list)
+            if self.target_index >= len_all or len_all > self.limit_number:
                 print('クローリング終了')
                 break
 
@@ -147,8 +124,8 @@ class WebsiteCrawler:
             url = self.all_url_list[self.target_index]
             print(f'走査対象：{url}')
 
-            # クローラのアクセスが制限されているページの場合、次のURLの走査に移行する
-            if self._is_robots_ng(url):
+            # URLがrobots.txtでアクセス許可されているURLかどうかを判定する
+            if not self.robotparser.can_fetch(self.user_agent, url):
                 print(f'{url}はアクセスが許可されていません')
                 continue  # 次ループへの移行
             
@@ -165,25 +142,14 @@ class WebsiteCrawler:
             soup = BeautifulSoup(res.text, 'html.parser')
 
             # robots meta判定
-            if self.is_nofollow_page(soup):
-                print(f'{url}内のリンクはアクセスが許可されていません')
-                continue  # 次ループへの移行
+            for robots_meta in soup.select("meta[name='robots']"):
+                if 'nofollow' in robots_meta['content']:
+                    print(f'{url}内のリンクはアクセスが許可されていません')
+                    continue  # 次ループへの移行
+            
+            # 解析済みBeautifulSoupオブジェクトから余分な情報を除去したURL一覧を抽出
+            cleaned_url_list = self._extract_url(soup)
 
-            # ページ内のaタグ一覧を取得
-            # なお、このうちrel属性がnofollowのタグはクローラがアクセスしてはならないので除去する
-            a_tag_list = self.select_a_tag_removed_nofollow(soup)
-
-            # aタグ一覧からこのページのURL一覧を取得（href属性の値を取得）
-            # この際相対パスを絶対パスに変換する
-            url_list = [
-                urljoin(url, a_tag.get('href')) for a_tag in a_tag_list
-            ]
-
-            # このページで取集したURLのリストから余分な情報を除去する
-            # (対象Webサイト外のURLとURLフラグメントの除去)
-            cleaned_url_list = self.remove_url_flagment(
-                self._remove_out_of_target_website(url_list)
-            )
             print(f'このページで収集したURL件数：{len(cleaned_url_list)}')
 
             # 収集したURLの追加
@@ -192,8 +158,11 @@ class WebsiteCrawler:
 
             # 重複したURLの除去
             before_duplicates_num = len(self.all_url_list)
-            self.all_url_list = self.remove_duplicates(self.all_url_list)
+            self.all_url_list = sorted(
+                set(self.all_url_list), key=self.all_url_list.index
+            )
             after_duplicates_num = len(self.all_url_list)
+
             print(f'重複除去件数：{before_duplicates_num - after_duplicates_num}')
             print(f'URL追加件数：{after_duplicates_num - before_extend_num}')
         
