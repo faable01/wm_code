@@ -7,124 +7,222 @@
     これ以外の情報は持たない状態で、クローリングを実装する
 """
 
-# 使いやすさが評価されているPythonのHTTPライブラリ
+# requests: 使いやすさが評価されているPythonのHTTPライブラリ
+# BeautifulSoup: HTML、XMLのパーサ（構文解析をするためのライブラリ）
+# urljoin: 相対パスを絶対パスに変換するための関数
+# urlparase: URL解析のための関数
+# time: 時刻に関する関数を提供するモジュール
+# re: 正規表現操作モジュール
+# robotparser: robots.txt(サイト側がクローラへアクセス制御を指示するためのtxt)を読み取るモジュール
 import requests
-
-# HTML、XMLのパーサ（構文解析をするためのライブラリ）
 from bs4 import BeautifulSoup
-
-# 相対パスを絶対パスに変換するための関数
 from urllib.parse import urljoin
-
-# URL解析のための関数
 from urllib.parse import urlparse
-
-# 時刻に関する関数を提供するモジュール
 import time
-
-# 正規表現操作モジュール
 import re
-
-# robots.txt(サイト側がクローラへアクセス制御を指示するためのtxt)を読み取るモジュール
 import urllib.robotparser
 
-# クローリングを開始する先頭のページ(今回はWorkship Magazineのトップページを指定)
-top_url = 'https://goworkship.com/magazine/'
 
-# 通信時のHTTPヘッダに設定する値
-headers = {
-    # User-Agentに設定する値
-    # サイト管理者に分かるよう自身の連絡先などを記載する
-    'User-Agent': 'sig-Bot/1.0 (@sig_Left: https://twitter.com/sig_Left)'
-}
+class WebsiteCrawler:
+    """
+        特定のWebサイト内のリンクを走査し、URLを収集するクローラ.
+        走査するWebサイトとその際のユーザーエージェントをコンストラクタで設定して使用する
+    """
 
-# クローリングを開始する先頭ページのURLの解析
-url_parse_result = urlparse(top_url)
+    def __init__(self, website_url, user_agent, limit_number):
+        """
+           website_url: 走査するWebサイトのURL
+           user_agent: ユーザエージェント名
+           limit_number: 収集するURLの限界数
+           all_url_list: 収集したURLを格納するリスト
+           target_index: 走査する対象の要素番号
+           robotparser: robots.txtを解析するパーサ
+        """
+        self.website_url = website_url
+        self.user_agent = user_agent
+        self.limit_number = limit_number
+        self.all_url_list = [website_url]
+        self.target_index = -1
+        self.robotparser = urllib.robotparser.RobotFileParser()
 
-# robots.txtの配置場所
-robots_url = f'{url_parse_result.scheme}://{url_parse_result.netloc}/robots.txt'
+    def _read_robots(self):
+        """
+           走査対象のWebサイトのrobots.txtを読み込む
+        """
+        # クローリングを開始する先頭ページのURLの解析
+        parsed = urlparse(self.website_url)
 
-# robots.txtの読み込み
-rp = urllib.robotparser.RobotFileParser()
-rp.set_url(robots_url)
-rp.read()
+        # robots.txtの配置場所
+        robots_url = f'{parsed.scheme}://{parsed.netloc}/robots.txt'
 
-# 収集したURLを格納するリスト
-all_url_list = [top_url] # 最初のスタート地点であるTOPページを格納
-
-# 走査対象の要素番号
-target_index = -1
-
-print('クローリング開始')
-while True:
-
-    # 走査対象の要素番号が収集したURLのリストの最後尾に達したか、収集したURLが200ページを越えていたら走査終了
-    if target_index >= len(all_url_list) -1 or len(all_url_list) >= 200:
-        print('クローリング終了')
-        break
+        # robots.txtの読み込み
+        self.robotparser.set_url(robots_url)
+        self.robotparser.read()
     
-    # 上記条件に当てはまらない場合、ページのカウントアップをし、走査を続行する
-    target_index += 1
-    target_index and time.sleep(2)  # 初回以降は走査開始まで最低でも1秒は空ける（連続したアクセスでサイトへの負荷をかけないため）
-    print(f'{target_index + 1}ページ目開始')
+    def _is_robots_ng(self, url):
+        """
+            指定のURLがrobots.txtでアクセス許可されているURLかどうかを判定する
+        """
+        return not self.robotparser.can_fetch(self.user_agent, url)
+
+    def _is_end(self):
+        """
+            クローリングを終了するかを判定する
+        """
+        len_all = len(self.all_url_list)
+        return self.target_index >= len_all or len_all > self.limit_number
+
+    def _remove_out_of_target_website(self, url_list):
+        """
+            走査対象のWebサイト外のURLをリストから削除する
+        """
+        return list(filter(lambda u: u.startswith(self.website_url), url_list))
     
+    @staticmethod
+    def is_nofollow_page(beautiful_soup):
+        """
+            このページのrobots metaがnofollowかどうかを判定する.
+            引数：BeautifulSoup解析済みオブジェクト
+        """
+        for robots_meta in beautiful_soup.select("meta[name='robots']"):
+            if 'nofollow' in robots_meta['content']:
+                return True
+    
+    @staticmethod
+    def select_a_tag_removed_nofollow(beautiful_soup):
+        """
+            rel属性がnofollowではないaタグ一覧を取得する.
+            引数：BeautifulSoup解析済みオブジェクト
+        """
+        return list(filter(
+            lambda tag: not 'nofollow' in (tag.get('rel') or ''), 
+            beautiful_soup.select('a'))
+        )
+
+    @staticmethod
+    def remove_url_flagment(url_list):
+        """
+            URLフラグメントを取り除き、純粋なURLのリストを返却する
+            引数：URLのリスト
+            （URLフラグメント：'https://foo.com/hoo#top'の#以降のこと）
+        """
+        return [(
+            lambda u: re.match('(.*?)#.*?', u) or re.match('(.*)', u)
+        )(url).group(1) for url in url_list]
+    
+    @staticmethod
+    def remove_duplicates(url_list):
+        """
+            リスト中の文字列から重複するものを削除する
+        """
+        return sorted(set(url_list), key=url_list.index)
+
+    def crawl(self):
+        """
+            インスタンス作成時に指定したWebサイトをクローリングし、
+            収集したURLのリストを返却する。
+        """
+        print('クローリング開始')
+
+        # robots.txtの読み込み
+        self._read_robots()
+
+        while True:
+
+            # 走査対象のindexをカウントアップする
+            self.target_index += 1
+
+            # 走査対象の要素番号が収集したURLのリストの最後尾に達したか、
+            # 収集したURLが200ページを越えていたら走査終了
+            if self._is_end():
+                print('クローリング終了')
+                break
+
+            # 初回以降は走査開始まで最低でも1秒は空ける（連続したアクセスでサイトへの負荷をかけないため）
+            self.target_index and time.sleep(2)
+
+            print(f'{self.target_index + 1}ページ目開始')
+
+            # 走査対象のURL
+            url = self.all_url_list[self.target_index]
+            print(f'走査対象：{url}')
+
+            # クローラのアクセスが制限されているページの場合、次のURLの走査に移行する
+            if self._is_robots_ng(url):
+                print(f'{url}はアクセスが許可されていません')
+                continue  # 次ループへの移行
+            
+            # 通信結果
+            headers = {'User-Agent': self.user_agent}
+            res = requests.get(url, headers=headers)
+
+            # 通信結果異常判定
+            if res.status_code != 200:
+                print(f'通信に失敗しました（ステータス：{res.status_code}）')
+                continue  # 次ループへの移行
+            
+            # 通信結果のHTMLを解析したBeautifulSoupオブジェクト
+            soup = BeautifulSoup(res.text, 'html.parser')
+
+            # robots meta判定
+            if self.is_nofollow_page(soup):
+                print(f'{url}内のリンクはアクセスが許可されていません')
+                continue  # 次ループへの移行
+
+            # ページ内のaタグ一覧を取得
+            # なお、このうちrel属性がnofollowのタグはクローラがアクセスしてはならないので除去する
+            a_tag_list = self.select_a_tag_removed_nofollow(soup)
+
+            # aタグ一覧からこのページのURL一覧を取得（href属性の値を取得）
+            # この際相対パスを絶対パスに変換する
+            url_list = [
+                urljoin(url, a_tag.get('href')) for a_tag in a_tag_list
+            ]
+
+            # このページで取集したURLのリストから余分な情報を除去する
+            # (対象Webサイト外のURLとURLフラグメントの除去)
+            cleaned_url_list = self.remove_url_flagment(
+                self._remove_out_of_target_website(url_list)
+            )
+            print(f'このページで収集したURL件数：{len(cleaned_url_list)}')
+
+            # 収集したURLの追加
+            before_extend_num = len(self.all_url_list)
+            self.all_url_list.extend(cleaned_url_list)
+
+            # 重複したURLの除去
+            before_duplicates_num = len(self.all_url_list)
+            self.all_url_list = self.remove_duplicates(self.all_url_list)
+            after_duplicates_num = len(self.all_url_list)
+            print(f'重複除去件数：{before_duplicates_num - after_duplicates_num}')
+            print(f'URL追加件数：{after_duplicates_num - before_extend_num}')
+        
+        return self.all_url_list
+
+
+# メイン処理の実行
+if __name__ == '__main__':
+
     # 走査対象のURL
-    target_url = all_url_list[target_index]
+    target_website = input(
+        'クローリングする対象のWebサイトのURLを入力してください >>> '
+    )
 
-    print(f'走査対象：{target_url}')
+    # ユーザーエージェント
+    user_agent = 'sig-Bot/1.0 (@sig_Left: https://twitter.com/sig_Left)'
 
-    # robots.txtのアクセス制御判定
-    is_robots_ng = not rp.can_fetch(headers['User-Agent'], target_url)
+    # 収集するURLの最大件数
+    limit_number = 200
 
-    # クローラのアクセスが制限されているページの場合、次のURLの走査に移行する
-    if is_robots_ng:
-        print(f'{target_url}はアクセスが許可されていません')
-        continue  # 次ループへの移行
-    
-    # 通信結果
-    res = requests.get(target_url, headers=headers)
-    
-    # 指定ページのHTML
-    html = res.text
-    
-    # HTMLを解析したBeautifulSoupオブジェクト
-    soup = BeautifulSoup(html, 'html.parser')
-    
-    # robots_metaがnofollow指定の場合、このページ内のリンクはクローラがアクセスしてはならない
-    for robots_meta in soup.select("meta[name='robots']"):
-        if 'nofollow' in robots_meta['content']:
-            print(f'{target_url}内のリンクはアクセスが許可されていません')
-            continue  # 次ループへの移行
-    
-    # ページ内のaタグ一覧を取得
-    # なお、このうちrel属性がnofollowのタグはクローラがアクセスしてはならないので除去する
-    a_tag_list = list(filter(lambda tag: not 'nofollow' in (tag.get('rel') or ''), soup.select('a')))
-    
-    # aタグ一覧からこのページのURL一覧を取得（href属性の値を取得）
-    # この際相対パスを絶対パスに変換する
-    url_list = [urljoin(target_url, a_tag.get('href')) for a_tag in a_tag_list]
-    
-    # URL一覧からWorkship Magazine以外のURLを除去する
-    url_list_only_wm = list(filter(lambda u: u.startswith(top_url), url_list))
+    # クローラの作成
+    crawler = WebsiteCrawler(target_website, user_agent, limit_number)
 
-    # URLフラグメントの除去（'https://foo.com/hoo#top'の#top部分）
-    url_list_nothing_flagment = [(lambda u: re.match('(.*?)#.*?', u) or re.match('(.*)', u))(url).group(1) for url in url_list_only_wm]
-    
-    # 収集したURLのリストにこのページで取得したURL一覧を追加
-    size_before_extend = len(all_url_list)
-    all_url_list.extend(url_list_nothing_flagment)
-    
-    # 重複するURLを削除する
-    size_before_delete = len(all_url_list)
-    all_url_list = sorted(set(all_url_list), key=all_url_list.index)
-    size_after_delete = len(all_url_list)
-    print(f'重複削除件数：{size_before_delete - size_after_delete}')
-    print(f'URL追加件数：{size_after_delete -size_before_extend}')
-    
-    print(f'{target_index + 1}ページ目終了')
+    # クローリングの実行
+    result_url_list = crawler.crawl()
 
-# 収集したURLの出力
-for url in all_url_list:
-    print(url)
+    # 収集したURLの出力
+    print('-------- 結果出力 --------')
+    for url in result_url_list:
+        print(url)
 
-print(f'総件数：{len(all_url_list)}')
+    print(f'総件数：{len(result_url_list)}')
