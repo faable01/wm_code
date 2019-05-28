@@ -42,19 +42,16 @@ headers = {
 while True:
     print(f'{page_index}ページ目解析開始')
     
-    # アクセスするURL
+    # アクセスする対象ページのURL
     url = f'https://goworkship.com/magazine/engineer/page/{page_index}/'
     
-    # 通信結果
-    res = requests.get(url, headers=headers)
-    
-    # 指定ページのHTML
-    html = res.text
+    # 対象ページのHTML
+    html = requests.get(url, headers=headers).text
     
     # HTMLを解析したBeautifulSoupオブジェクト
     soup = BeautifulSoup(html, 'html.parser')
     
-    # このページの記事タイトルのHTML要素一覧を取得
+    # 対象ページの記事タイトルのHTML要素一覧を取得
     title_tag_list = soup.select('.article-title')
     
     # 記事タイトルのHTML要素が8つ以下の場合、これ以上記事は存在しないためループを抜ける

@@ -91,7 +91,7 @@ class WebsiteCrawler:
             urljoin(self.website_url, tag.get('href')) for tag in a_tag_list
         ]
 
-        # 余分な情報を除外したURL一覧を返却する
+        # 余分な情報を除外したURL一覧を返ぎ却する
         return self._clean_url_list(url_list)
 
     def crawl(self):
