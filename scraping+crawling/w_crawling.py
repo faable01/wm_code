@@ -26,7 +26,7 @@ import urllib.robotparser
 class WebsiteCrawler:
     """
         特定のWebサイト内のリンクを走査し、URLを収集するクローラ.
-        走査するWebサイトとその際のユーザーエージェントをコンストラクタで設定して使用する
+        走査するWebサイトとその際のユーザーエージェント、収集するURLの限界数をコンストラクタで設定して使用する
     """
 
     def __init__(self, website_url, user_agent, limit_number):
@@ -45,7 +45,7 @@ class WebsiteCrawler:
         self.target_index = -1
         self.robotparser = urllib.robotparser.RobotFileParser()
 
-    def _read_robots(self):
+    def __read_robots__(self):
         """
            走査対象のWebサイトのrobots.txtを読み込む
         """
@@ -102,7 +102,7 @@ class WebsiteCrawler:
         print('クローリング開始')
 
         # robots.txtの読み込み
-        self._read_robots()
+        self.__read_robots__()
 
         while True:
 
@@ -173,9 +173,7 @@ class WebsiteCrawler:
 if __name__ == '__main__':
 
     # 走査対象のURL
-    target_website = input(
-        'クローリングする対象のWebサイトのURLを入力してください >>> '
-    )
+    target_website = 'https://goworkship.com/magazine/'
 
     # ユーザーエージェント
     user_agent = 'sig-Bot/1.0 (@sig_Left: https://twitter.com/sig_Left)'

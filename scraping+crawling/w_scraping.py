@@ -16,13 +16,11 @@
     そのため、classが"article-title"の要素がページ内に8件しか見つからなくなったら、これ以上は記事が存在しない。
 """
 
-# 使いやすさが評価されているPythonのHTTPライブラリ
+# requests: 使いやすさが評価されているPythonのHTTPライブラリ
+# BeautifulSoup: HTML、XMLのパーサ（構文解析をするためのライブラリ）
+# time: 時刻に関する関数を提供するモジュール
 import requests
-
-# HTML、XMLのパーサ（構文解析をするためのライブラリ）
 from bs4 import BeautifulSoup
-
-# 時刻に関する関数を提供するモジュール
 import time
 
 # ENGIINEERカテゴリの全記事のタイトルを格納する変数

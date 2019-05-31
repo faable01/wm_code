@@ -15,20 +15,28 @@ headers = {
     'User-Agent': 'sig-Bot/1.0 (@sig_Left: https://twitter.com/sig_Left)'
 }
 
+# アクセスするURL(初期値はクローリングを開始するURL)
+url = start_url
+
+# HTMLの格納場所
+html_list = []
+
 for i in range(5):
-
-    # アクセスするURL(初期値はクローリングを開始するURL)
-    url = start_url
-
-    # for i in range(5):
+    print(f'{i + 1}ページ目クローリング開始')
+    
     # 対象ページのhtml
     html = requests.get(url, headers=headers).text
-
+    
+    # 取得したHTMLの格納
+    html_list.append(html)
+    
     # ページ中のaタグ内のURLを取得する
-    url = random.choice(re.findall('<a.*?href="(https://.+?)".*?>', html))
-
-    # 取得したURLの出力
-    print(url)
-
+    url = random.choice(re.findall('<a.+?href="(https://.+?)".*?>', html))
+    
     # 次のループに行く前に最低でも1秒以上待機する(サイトに負荷をかけないため)
     time.sleep(2)
+
+# 収集したHTMLの出力
+for i, html in enumerate(html_list):
+    print(f'{i + 1}ページ取得結果')
+    print(html)

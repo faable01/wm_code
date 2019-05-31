@@ -1,0 +1,50 @@
+<p>[リード文]</p>
+<p> </p>
+<h2>スクレイピング・クローリング、なにが違うの？</h2>
+<p> </p>
+<h3>情報を抽出するスクレイピング</h3>
+<p>スクレイピング（scraping）とは元来『こすること』『削りとること』『剥離物』を意味する単語です。</p>
+<p> </p>
+<p> </p>
+<h3>Web上を巡回するクローリング</h3>
+<p>クローリング（crawling）とは『徘徊』『這いずりまわる』を意味する英単語です。</p>
+<p> </p>
+<h2>コードでみるスクレイピングとクローリング</h2>
+<p> </p>
+<h3>サイト内の構造を解析して狙った場所の情報を抽出するスクレイピング</h3>
+<p>
+[code lang='**Python**']<br />"""<br />スクレイピングを説明するための最小限のコードを書く.<br />Workship
+    MagazineのENGINEERカテゴリの最新記事タイトルを取得する<br />記事タイトルは以下のように記述されている.<br />&lt;h3
+    class="article-title"&gt;IoTソフトウェア開発における7つの課題。決まらない"標準規格"&lt;/h3&gt;<br />"""<br />
+import re<br />import requests<br />
+# スクレイピングする対象ページのURL<br />target_url = "https://goworkship.com/magazine/engineer/"<br />
+# サイト管理者に分かるよう自身の連絡先などをUser-Agentに記載する<br />headers = {<br />'User-Agent': 'sig-Bot/1.0 (@sig_Left:
+    https://twitter.com/sig_Left)'<br />}<br />
+# 対象ページのhtml<br />html = requests.get(target_url, headers=headers).text<br />
+# 正規表現で対象ページ中の必要な情報を取得する<br />reg = '.+article-title.+&gt;(.+)&lt;'<br />first_article_title = re.search(reg,
+    str).group(1)<br />
+print(first_article_title)<br />[/code]<br />
+</p>
+<p> </p>
+<h3>サイト構造を問わず、次から次へと発見したページにアクセスするクローリング</h3>
+<p>
+[code lang='**Python**']<br />"""<br />クローリングを説明するための最小限のコードを書く<br />"""<br />
+import re<br />import requests<br />import time<br />import random<br />
+# クローリングを開始するURL<br />start_url = "https://goworkship.com/magazine/"<br />
+# サイト管理者に分かるよう自身の連絡先などをUser-Agentに記載する<br />headers = {<br />'User-Agent': 'sig-Bot/1.0 (@sig_Left:
+    https://twitter.com/sig_Left)'<br />}<br />
+# アクセスするURL(初期値はクローリングを開始するURL)<br />url = start_url<br />
+for i in range(5):<br /># 対象ページのhtml<br />html = requests.get(url, headers=headers).text<br />
+# ページ中のaタグ内のURLを取得する<br />url = random.choice(re.findall('&lt;a.*?href="(https://.+?)".*?&gt;', html))<br />
+# 取得したURLの出力<br />print(url)<br />
+# 次のループに行く前に最低でも1秒以上待機する(サイトに負荷をかけないため)<br />time.sleep(2)<br />[/code]<br />
+</p>
+<p> </p>
+<h2>スクレイピングを実装！ PythonでWorkship Magazineの記事タイトル一覧を作成する</h2>
+<p>[code lang='**Python**']<br />[/code]</p>
+<p> </p>
+<h2>クローリングを実装！PythonでWorkship Magazineを巡回してページURLを収集する</h2>
+<p>[code lang='**Python**']<br />[/code]</p>
+<p> </p>
+<h2>まとめ：スクレイピングは抽出、クローリングは巡回</h2>
+<p> </p>

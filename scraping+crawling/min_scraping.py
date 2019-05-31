@@ -20,7 +20,7 @@ headers = {
 html = requests.get(target_url, headers=headers).text
 
 # 正規表現で対象ページ中の必要な情報を取得する
-reg = '.+article-title.+>(.+)<'
-first_article_title = re.search(reg, str).group(1)
+reg = 'article-title.+?>(.+?)<'
+first_article_title = re.search(reg, html).group(1)
 
 print(first_article_title)
