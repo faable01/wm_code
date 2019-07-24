@@ -46,9 +46,9 @@ public class BegginerMistakes {
 
     /** コンストラクタの後の括弧は匿名関数とかインスタンスイニシャライザとか */
     private static void useAnonymousAndInitializer() {
-        List<String> l = new ArrayList<String>(){
+        List<String> l = new ArrayList<String>(){  // 匿名クラス（ここではArrayList<String>を継承する匿名クラスが作られている）
             private static final long serialVersionUID = 1L;
-            {
+            {  // インスタンスイニシャライザ（コンストラクタ実行前に実行される）
                 this.add("foo");
                 this.add("hoo");
             }
