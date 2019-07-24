@@ -58,13 +58,14 @@ public class BegginerMistakes {
         // ▲ インスタンス作った時点ですぐに要素が追加されている
     }
 
+    /** オブジェクトの並行変更を検出すると発生する例外（リストの繰り返し処理中などで起きがち） */
     private static void raiseConcurrentModificationException() {
 
         // ## 例外パターン1（サブリスト作成後に元配列に要素追加）
-        List<String> l = new ArrayList<>(Arrays.asList("foo", "hoo", "hoge"));
-        List<String> sl = l.subList(1, 2);
-        l.add("foooooo");
-        System.out.println(l);  // [foo, hoo, hoge, foooooo]
+        List<String> list1_ng = new ArrayList<>(Arrays.asList("foo", "hoo", "hoge"));
+        List<String> sl = list1_ng.subList(1, 2);
+        list1_ng.add("foooooo");
+        System.out.println(list1_ng);  // [foo, hoo, hoge, foooooo]
         try {
             System.out.println(sl);
         } catch(Exception e) {
@@ -72,44 +73,72 @@ public class BegginerMistakes {
             // 出力：java.util.ConcurrentModificationException
         }
 
-        // ## 例外パターン2
+        // ## 例外にならないパターン1（サブリスト作成前にadd）
+        List<String> list1_ok = new ArrayList<>(Arrays.asList("foo", "hoo", "hoge"));
+        list1_ok.add("foooooo");  // 
+        List<String> sli = list1_ng.subList(1, 2);
+        System.out.println(list1_ok);  // [foo, hoo, hoge, foooooo]
+        System.out.println(sli);  // [hoge]
+
+        // ## 例外パターン2（繰り返し処理中の要素番号の変更（番号をひとつ前に詰める））
+        List<String> list2_ng = new ArrayList<>(Arrays.asList("foo", "hoo", "hoge"));
         try {
-            // l: [foo, hoo, hoge, foooooo]
-            for (String str : l) {
+            for (String str : list2_ng) {
                 if ("foo".equals(str)) {
-                    l.remove(str);
+                    list2_ng.remove(str);
                 }
             }
         } catch (Exception e) {
             System.out.println(e);
             // 出力：java.util.ConcurrentModificationException
         }
-        System.out.println(l);  // [hoo, hoge, foooooo]
+        System.out.println(list1_ng);  // [hoo, hoge]
         // （エラー出てもキャッチすれば要素操作の実行自体はされている）
 
-        // ## 例外にならないパターン1（サブリスト作成前にadd）
-        List<String> li = new ArrayList<>(Arrays.asList("foo", "hoo", "hoge"));
-        li.add("foooooo");  // 
-        List<String> sli = l.subList(1, 2);
-        System.out.println(li);  // [foo, hoo, hoge, foooooo]
-        System.out.println(sli);  // [hoge]
-
         // ## 例外にならないパターン2（要素番号の変更処理のあと、配列のループが存在しない）
-        // [foo, hoo, hoge, foooooo]
-        for (String str : li) {
+        // [foo, hoo, hoge]
+        List<String> list2_ok = new ArrayList<>(Arrays.asList("foo", "hoo", "hoge"));
+        for (String str : list2_ok) {
             System.out.println("走査対象：" + str);
-            if ("hoge".equals(str)) {
-                li.remove(str);
+            if ("hoo".equals(str)) {
+                list2_ok.remove(str);
             }
         }
-        System.out.println(li);
+        System.out.println(list2_ok);
         /**
          * ### 出力
          * 走査対象：foo
          * 走査対象：hoo
-         * 走査対象：hoge
-         * [foo, hoo, foooooo]
+         * [foo, hoge]
          */
-    }
 
+        // ## 例外パターン3（繰り返し処理中の要素番号の変更（末尾の番号を増やす））
+        List<String> list3_ng = new ArrayList<>(Arrays.asList("foo", "hoo", "hoge"));
+        try {
+            for (String str : list3_ng) {
+                list3_ng.add(str);
+                if ("hoge".equals(str)) {
+                    break;
+                }
+            }   
+        } catch (Exception e) {
+            System.out.println(e);
+            // 出力：java.util.ConcurrentModificationException
+        }
+        System.out.println(list3_ng);  // [foo, hoo, hoge, foo]
+        
+        // ## パターン3はどの要素番号でaddしようと繰り返し処理との兼ね合いでアウト
+        List<String> list3_ng2 = new ArrayList<>(Arrays.asList("foo", "hoo", "hoge"));
+        try {
+            for (String str : list3_ng2) {
+                if ("hoge".equals(str)) {
+                    list3_ng2.add(str);
+                }
+            }   
+        } catch (Exception e) {
+            System.out.println(e);
+            // 出力：java.util.ConcurrentModificationException
+        }
+        System.out.println(list3_ng2);  // [foo, hoo, hoge, hoge]
+    }
 }
